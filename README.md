@@ -32,7 +32,7 @@ This bypasses iCloud web authentication and trusted device verification workflow
 ## What is Needed to Reproduce
 
 - A valid Apple ID and password (controlled test account)
-- A valid PET token (captured from an iOS session or extracted using MITM proxying)
+- A valid PET token (captured from an iOS session or extracted using a proxy)
 - At least one device registered under the account in **offline state**
 
 > Note: This PoC was conducted using a test account and simulated devices.
@@ -112,13 +112,9 @@ This bypasses iCloud web authentication and trusted device verification workflow
 
 ## Proof of Concept
 
-A proof-of-concept is attached in a ZIP bundle and includes:
+A proof-of-concept (not included publicly) demonstrates the full flow and includes:
 
 - `poc_device_remove.py` – Python script demonstrating the full flow
-- `poc_device_remove.php` – Equivalent PHP version
-- `demo_log.txt` – Output showing successful removal of an offline test device
-
-No production credentials or personal data are included.
 
 ---
 
@@ -132,8 +128,15 @@ No production credentials or personal data are included.
 
 ## Disclosure Policy
 
-This report is submitted in accordance with Apple’s Responsible Disclosure program. I am available to provide additional information, test environment access, or confirmation as needed.
+This issue was reported to Apple in accordance with the Apple Security Bounty program.
 
-Thank you,  
+Apple Security Bounty ID: OE1102082402813
+
+## References
+
+- https://support.apple.com/security
+- https://developer.apple.com/security-bounty/
+
+## Author
+
 Arber Kadriu
-kadriuarber@icloud.com
