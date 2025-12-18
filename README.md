@@ -1,5 +1,17 @@
 # fmipmobile.icloud.com: improper token scoping allows unauthorized iCloud device removal via PET
+**Apple Security Bounty ID:** OE1102082402813  
+**Initial Report:** 2025-05-02 21:39 (EST)
 
+---
+
+## Disclosure Timeline
+
+- **Reported to Apple:** March 23, 2024  
+- **Apple Report ID:** OE1102082402813  
+- **Patched:** July 13, 2025 
+- **CVE ID:** Pending (submitted via MITRE)
+
+---
 ## Summary
 
 A vulnerability in Apple's Find My iPhone (FMiP) backend (`fmipmobile.icloud.com`) allows an attacker with a valid Apple ID and its associated PET (Private Endpoint Token) to enumerate and remove devices from the account **without triggering two-factor authentication (2FA)** or validating device ownership.
@@ -140,3 +152,8 @@ Apple Security Bounty ID: OE1102082402813
 ## Author
 
 Arber Kadriu
+
+## License
+
+This material is shared for educational and transparency purposes to promote responsible security research and awareness.
+
