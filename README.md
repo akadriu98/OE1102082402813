@@ -9,7 +9,7 @@
 - **Reported to Apple:** March 23, 2024  
 - **Apple Report ID:** OE1102082402813  
 - **Patched:** July 13, 2025 
-- **CVE ID:** Pending (submitted via MITRE)
+- **CVE ID:** CVE-2025-68640
 
 ---
 ## Summary
