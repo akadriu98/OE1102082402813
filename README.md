@@ -6,7 +6,7 @@
 
 ## Disclosure Timeline
 
-- **Reported to Apple:** March 23, 2024  
+- **Reported to Apple:** May 02, 2025 
 - **Apple Report ID:** OE1102082402813  
 - **Patched:** July 13, 2025 
 - **CVE ID:** CVE-2025-68640
